@@ -1,12 +1,11 @@
 import {render, screen, waitForElementToBeRemoved} from "@testing-library/react";
 import BrowseProducts from "../../src/pages/BrowseProductsPage.tsx";
-import {Theme} from "@radix-ui/themes";
 import {afterAll, beforeAll, expect} from "vitest";
 import {userEvent} from "@testing-library/user-event";
 import {db, getProductsByCategory} from "../mocks/db.ts";
 import {Category, Product} from "../../src/entities.ts";
-import {CartProvider} from "../../src/providers/CartProvider.tsx";
 import {simulateDelay, simulateErrorResponse} from "../utils.ts";
+import AllProviders from "../AllProviders.tsx";
 
 describe('BrowserProductPage', () => {
     const categories: Category[] = [];
@@ -144,11 +143,8 @@ describe('BrowserProductPage', () => {
 
 const renderBrowserProducts = () => {
     render(
-        <CartProvider>
-            <Theme>
-                <BrowseProducts/>
-            </Theme>
-        </CartProvider>
+        <BrowseProducts/>
+        , {wrapper: AllProviders}
     );
     return {
         getResourcesSkeleton: (regExp: RegExp) => screen.queryByRole('progressbar', {name: new RegExp(regExp)}),
