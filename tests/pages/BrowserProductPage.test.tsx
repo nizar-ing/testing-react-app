@@ -3,7 +3,7 @@ import BrowseProducts from "../../src/pages/BrowseProductsPage.tsx";
 import {Theme} from "@radix-ui/themes";
 import {afterAll, beforeAll, expect} from "vitest";
 import {userEvent} from "@testing-library/user-event";
-import {db} from "../mocks/db.ts";
+import {db, getProductsByCategory} from "../mocks/db.ts";
 import {Category, Product} from "../../src/entities.ts";
 import {CartProvider} from "../../src/providers/CartProvider.tsx";
 import {simulateDelay, simulateErrorResponse} from "../utils.ts";
@@ -27,32 +27,6 @@ describe('BrowserProductPage', () => {
         db.category.deleteMany({where: {id: {in: categoriesIds}}});
         db.product.deleteMany({where: {id: {in: productsIds}}});
     });
-
-    const renderBrowserProducts = () => {
-        render(
-            <CartProvider>
-                <Theme>
-                    <BrowseProducts/>
-                </Theme>
-            </CartProvider>
-        );
-        return {
-            getResourcesSkeleton: (regExp: RegExp) => screen.queryByRole('progressbar', {name: new RegExp(regExp)}),
-            selectCategory: async () => {
-                // Arrange part
-                const combobox = await screen.findByRole('combobox');
-                const user = userEvent.setup();
-                await user.click(combobox);
-
-                // Act part
-                const selectedCategory = categories[0];
-                const option = screen.getByRole('option', {name: selectedCategory.name});
-                await user.click(option);
-
-                return selectedCategory;
-            }
-        }
-    }
 
     it('should show a loading skeleton when fetching categories ', () => {
         // server.use(http.get('/categories', async () => {
@@ -130,52 +104,72 @@ describe('BrowserProductPage', () => {
         });
     });
     it('should filter products by category', async () => {
-        const {selectCategory} = renderBrowserProducts();
-
-        // Arrange part
-        // const combobox = await screen.findByRole('combobox');
-        // const user = userEvent.setup();
-        // await user.click(combobox);
-
-        // Act part
-        // const selectedCategory = categories[0];
-        // const option = screen.getByRole('option', {name: selectedCategory.name});
-        // await user.click(option);
-        const selectedCategory = await selectCategory();
+        const {selectCategory, expectProductsToBeInTheDocuments} = renderBrowserProducts();
+        await selectCategory(categories[0].name);
 
         // Assert part
-        const products = db.product.findMany({
-            where: {
-                categoryId: {equals: selectedCategory.id}
-            }
-        });
-        const rows = screen.getAllByRole('row');
-        const rowsData = rows.slice(1); // we slice the header row "entête" from the expectation
-        expect(rowsData).toHaveLength(products.length);
-        products.forEach((product) => {
-            expect(screen.getByText(product.name)).toBeInTheDocument();
-        })
+        const products = getProductsByCategory(categories[0].id);
+        expectProductsToBeInTheDocuments(products);
     });
     it('should render all products if all category is selected', async () => {
-        renderBrowserProducts();
-
-        // Arrange part
-        const combobox = await screen.findByRole('combobox');
-        const user = userEvent.setup();
-        await user.click(combobox);
-
-        // Act part
-        const option = screen.getByRole('option', {name: /all/i});
-        await user.click(option);
+        const {selectCategory, expectProductsToBeInTheDocuments} = renderBrowserProducts();
+        await selectCategory("All");
 
         // Assert part
         const products = db.product.getAll();
-        const rows = screen.getAllByRole('row');
-        const rowsData = rows.slice(1); // we slice the header row "entête" from the expectation
-        expect(rowsData).toHaveLength(products.length);
+        expectProductsToBeInTheDocuments(products);
 
-        products.forEach((product) => {
-            expect(screen.getByText(product.name)).toBeInTheDocument();
-        })
+        //renderBrowserProducts();
+
+        // // Arrange part
+        // const combobox = await screen.findByRole('combobox');
+        // const user = userEvent.setup();
+        // await user.click(combobox);
+        //
+        // // Act part
+        // const option = screen.getByRole('option', {name: /all/i});
+        // await user.click(option);
+        //
+        // // Assert part
+        // const products = db.product.getAll();
+        // const rows = screen.getAllByRole('row');
+        // const rowsData = rows.slice(1); // we slice the header row "entête" from the expectation
+        // expect(rowsData).toHaveLength(products.length);
+        //
+        // products.forEach((product) => {
+        //     expect(screen.getByText(product.name)).toBeInTheDocument();
+        // })
     });
 })
+
+const renderBrowserProducts = () => {
+    render(
+        <CartProvider>
+            <Theme>
+                <BrowseProducts/>
+            </Theme>
+        </CartProvider>
+    );
+    return {
+        getResourcesSkeleton: (regExp: RegExp) => screen.queryByRole('progressbar', {name: new RegExp(regExp)}),
+        selectCategory: async (regExp: string) => {
+            // Arrange part
+            const combobox = await screen.findByRole('combobox');
+            const user = userEvent.setup();
+            await user.click(combobox);
+
+            // Act part
+            const option = screen.getByRole('option', {name: new RegExp(regExp, 'i')});
+            await user.click(option);
+        },
+        expectProductsToBeInTheDocuments: (products: Product[]) => {
+            const rows = screen.getAllByRole('row');
+            const rowsData = rows.slice(1); // we slice the header row "entête" from the expectation
+
+            expect(rowsData).toHaveLength(products.length);
+            products.forEach((product) => {
+                expect(screen.getByText(product.name)).toBeInTheDocument();
+            })
+        }
+    }
+}
